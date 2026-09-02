@@ -16,14 +16,14 @@ use that library for cryptography.
 
 | Dependency | Version | License | Project |
 |---|---:|---|---|
-| Bouncy Castle `bcprov-jdk15to18` | 1.85.1 | MIT | https://www.bouncycastle.org/ |
+| Bouncy Castle `bcprov-jdk15to18` | 1.85.2 | MIT | https://www.bouncycastle.org/ |
 | AndroidX Core/Core KTX | 1.19.0 | Apache-2.0 | https://developer.android.com/jetpack/androidx |
 | AndroidX Lifecycle runtime/viewmodel Compose | 2.11.0 | Apache-2.0 | https://developer.android.com/jetpack/androidx |
 | AndroidX Activity Compose | 1.13.0 | Apache-2.0 | https://developer.android.com/jetpack/androidx |
 | AndroidX AppCompat | 1.7.1 | Apache-2.0 | https://developer.android.com/jetpack/androidx |
 | AndroidX Core Splashscreen | 1.2.0 | Apache-2.0 | https://developer.android.com/jetpack/androidx |
 | Google Material Components | 1.14.0 | Apache-2.0 | https://github.com/material-components/material-components-android |
-| Jetpack Compose BOM and declared Compose modules | 2026.06.01 | Apache-2.0 | https://developer.android.com/jetpack/compose |
+| Jetpack Compose BOM and declared Compose modules | 2026.08.00 | Apache-2.0 | https://developer.android.com/jetpack/compose |
 | AndroidX Navigation Compose | 2.9.8 | Apache-2.0 | https://developer.android.com/jetpack/androidx |
 | Kotlinx Serialization JSON | 1.11.0 | Apache-2.0 | https://github.com/Kotlin/kotlinx.serialization |
 | ZXing Core | 3.5.3 | Apache-2.0 | https://github.com/zxing/zxing |
@@ -36,7 +36,7 @@ use that library for cryptography.
 | Gradle wrapper | 9.4.1 | Apache-2.0 | https://gradle.org/ |
 | Android Gradle Plugin | 9.2.1 | Apache-2.0 | https://developer.android.com/build |
 | Kotlin Gradle, Compose, and Serialization plugins | 2.4.0 | Apache-2.0 | https://kotlinlang.org/ |
-| Compose Screenshot plugin/API | 0.0.1-alpha15 | Apache-2.0 | https://developer.android.com/studio/preview/compose-screenshot-testing |
+| Compose Screenshot plugin/API | 0.0.1-alpha16 | Apache-2.0 | https://developer.android.com/studio/preview/compose-screenshot-testing |
 | Foojay toolchain resolver convention | 0.8.0 | Apache-2.0 | https://github.com/gradle/foojay-toolchains |
 | JaCoCo | 0.8.14 | EPL-2.0 | https://www.jacoco.org/jacoco/ |
 | JUnit 4 | 4.13.2 | EPL-1.0 | https://junit.org/junit4/ |

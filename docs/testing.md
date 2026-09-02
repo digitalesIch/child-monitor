@@ -23,7 +23,7 @@ The project intentionally keeps the existing JUnit 4 stack: Robolectric/JVM test
 
 Screenshot references live in `app/src/screenshotTestDebug/reference/`. Validation reports are written to `app/build/reports/screenshotTest/preview/debug/`. The debug JVM coverage report is written to `app/build/reports/jacoco/jacocoDebugUnitTestReport/` in XML and HTML formats.
 
-Compose Preview Screenshot Testing is experimental and currently uses `com.android.compose.screenshot` `0.0.1-alpha15`. Reference images are LayoutLib renderings, not evidence of camera, notification, foreground-service, audio-device, OEM, or physical-display behavior. Regenerate baselines deliberately after reviewing visual changes; do not use baseline updates merely to make CI pass.
+Compose Preview Screenshot Testing is experimental and currently uses `com.android.compose.screenshot` `0.0.1-alpha16`. Reference images are LayoutLib renderings, not evidence of camera, notification, foreground-service, audio-device, OEM, or physical-display behavior. Regenerate baselines deliberately after reviewing visual changes; do not use baseline updates merely to make CI pass.
 
 ### Screen Behavior And Configuration Coverage
 
