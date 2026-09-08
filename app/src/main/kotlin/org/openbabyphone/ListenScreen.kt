@@ -11,6 +11,9 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +53,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -72,12 +80,14 @@ import kotlinx.coroutines.delay
 import org.openbabyphone.service.ListenSessionState
 import org.openbabyphone.service.ServiceConnectionManager
 import org.openbabyphone.service.isAuthoritativelyActive
+import org.openbabyphone.ui.theme.Motion
 import org.openbabyphone.ui.theme.Spacing
 import org.openbabyphone.viewmodel.ListenPrimaryAction
 import org.openbabyphone.viewmodel.ListenUiState
 import org.openbabyphone.viewmodel.ListenViewModel
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -466,20 +476,23 @@ private fun AudioSignalIndicator(
     val loudness = if (signalState == AudioSignalState.NoRecentAudio) 0f else {
         rollingLoudness(volumeHistory, volumeNorm)
     }
-    val activeBars = signalBarCount(signalState, loudness)
     val stateLabel = stringResource(signalState.labelRes)
     val signalContentDescription = stringResource(R.string.audio_signal_content_description, stateLabel)
     val stateColor = when (signalState) {
         AudioSignalState.NoRecentAudio -> MaterialTheme.colorScheme.onSurfaceVariant
         AudioSignalState.Quiet -> MaterialTheme.colorScheme.primary
         AudioSignalState.SoundDetected -> MaterialTheme.colorScheme.primary
-        AudioSignalState.LoudSound -> MaterialTheme.colorScheme.secondary
+        AudioSignalState.LoudSound -> MaterialTheme.colorScheme.primary
     }
-    val backgroundMix = when (signalState) {
-        AudioSignalState.NoRecentAudio -> 0.04f
-        AudioSignalState.Quiet -> 0.08f
-        AudioSignalState.SoundDetected -> 0.14f
-        AudioSignalState.LoudSound -> 0.28f
+    val backgroundMix by animateFloatAsState(
+        targetValue = audioSignalBackgroundMix(signalState, loudness),
+        animationSpec = tween(Motion.DurationShort),
+        label = "audio signal background"
+    )
+    val descriptionColor = if (backgroundMix >= AUDIO_SIGNAL_STRONG_CONTENT_MIX) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     Column(
@@ -517,32 +530,100 @@ private fun AudioSignalIndicator(
                     .padding(horizontal = Spacing.space12, vertical = Spacing.space4)
             )
         }
-        Row(
+        VolumeWaveform(
+            volumeHistory = volumeHistory,
+            volumeNorm = volumeNorm,
+            stale = signalState == AudioSignalState.NoRecentAudio,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(72.dp),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.space8),
-            verticalAlignment = Alignment.Bottom
-        ) {
-            repeat(SIGNAL_BAR_COUNT) { index ->
-                val filled = index < activeBars
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height((18 + index * 9).dp)
-                        .clip(MaterialTheme.shapes.small)
-                        .background(
-                            if (filled) stateColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
-                        )
-                )
-            }
-        }
+                .height(88.dp)
+                .testTag("audio_signal_waveform")
+        )
         Text(
             text = stringResource(signalState.descriptionRes),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = descriptionColor
         )
     }
+}
+
+@Composable
+private fun VolumeWaveform(
+    volumeHistory: FloatArray,
+    volumeNorm: Float,
+    stale: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val waveformColor = MaterialTheme.colorScheme.primary
+    val outlineColor = MaterialTheme.colorScheme.outline
+    Canvas(modifier = modifier) {
+        val pointCount = (size.width / WAVEFORM_POINT_SPACING.toPx())
+            .toInt()
+            .coerceIn(2, WAVEFORM_MAX_POINTS)
+        val samples = waveformSamples(volumeHistory, volumeNorm, pointCount)
+        val baseline = size.height * WAVEFORM_BASELINE_FRACTION
+        val maxHeight = size.height * WAVEFORM_MAX_HEIGHT_FRACTION
+        val firstSignal = samples.indexOfFirst { it > WAVEFORM_SILENCE_FLOOR }
+        val signalAlpha = if (stale) 0.32f else 1f
+
+        drawLine(
+            color = outlineColor.copy(alpha = 0.28f),
+            start = Offset(0f, baseline),
+            end = Offset(size.width, baseline),
+            strokeWidth = 1.dp.toPx()
+        )
+
+        if (firstSignal < 0) return@Canvas
+
+        val waveformPath = Path()
+        val fillPath = Path()
+        val firstX = waveformX(firstSignal, pointCount, size.width)
+        fillPath.moveTo(firstX, baseline)
+        samples.forEachIndexed { index, sample ->
+            if (index < firstSignal) return@forEachIndexed
+            val x = waveformX(index, pointCount, size.width)
+            val y = baseline - maxHeight * sample
+            if (index == firstSignal) {
+                waveformPath.moveTo(x, y)
+            } else {
+                waveformPath.lineTo(x, y)
+            }
+            fillPath.lineTo(x, y)
+        }
+        val lastX = waveformX(samples.lastIndex, pointCount, size.width)
+        fillPath.lineTo(lastX, baseline)
+        fillPath.close()
+
+        drawPath(
+            path = fillPath,
+            brush = Brush.horizontalGradient(
+                listOf(
+                    waveformColor.copy(alpha = 0.08f * signalAlpha),
+                    waveformColor.copy(alpha = 0.24f * signalAlpha),
+                    waveformColor.copy(alpha = 0.38f * signalAlpha)
+                )
+            )
+        )
+        drawPath(
+            path = waveformPath,
+            brush = Brush.horizontalGradient(
+                listOf(
+                    waveformColor.copy(alpha = 0.32f * signalAlpha),
+                    waveformColor.copy(alpha = 0.72f * signalAlpha),
+                    waveformColor.copy(alpha = signalAlpha)
+                )
+            ),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = 2.dp.toPx(),
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+    }
+}
+
+private fun waveformX(index: Int, pointCount: Int, width: Float): Float {
+    return if (pointCount <= 1) 0f else index.toFloat() / (pointCount - 1) * width
 }
 
 internal fun rollingLoudness(volumeHistory: FloatArray, volumeNorm: Float): Float {
@@ -559,16 +640,56 @@ internal fun rollingLoudness(volumeHistory: FloatArray, volumeNorm: Float): Floa
     return (average * 0.65f + peak * 0.35f).coerceIn(0f, 1f)
 }
 
-internal fun normalizedRecentSample(
+internal fun audioSignalBackgroundMix(signalState: AudioSignalState, loudness: Float): Float {
+    if (signalState == AudioSignalState.NoRecentAudio) return AUDIO_SIGNAL_STALE_BACKGROUND_MIX
+    val loudnessProgress = (loudness / LOUD_SIGNAL_THRESHOLD).coerceIn(0f, 1f)
+    return (AUDIO_SIGNAL_BASE_BACKGROUND_MIX +
+        loudnessProgress * (AUDIO_SIGNAL_MAX_BACKGROUND_MIX - AUDIO_SIGNAL_BASE_BACKGROUND_MIX))
+        .coerceIn(AUDIO_SIGNAL_BASE_BACKGROUND_MIX, AUDIO_SIGNAL_MAX_BACKGROUND_MIX)
+}
+
+internal fun waveformSamples(
     volumeHistory: FloatArray,
     volumeNorm: Float,
-    index: Int,
-    count: Int
-): Float {
-    if (volumeHistory.isEmpty()) return 0f
-    val sampleIndex = ((index + 1f) / count * volumeHistory.size).toInt()
-        .coerceIn(0, volumeHistory.lastIndex)
-    return (volumeHistory[sampleIndex] * volumeNorm).coerceIn(0f, 1f)
+    pointCount: Int,
+    windowSize: Int = WAVEFORM_WINDOW_SAMPLES
+): FloatArray {
+    if (pointCount <= 0) return FloatArray(0)
+    if (volumeHistory.isEmpty() || windowSize <= 0) return FloatArray(pointCount)
+
+    val windowStart = max(0, volumeHistory.size - windowSize)
+    val availableSamples = volumeHistory.size - windowStart
+    val availablePoints = (pointCount.toLong() * availableSamples / windowSize)
+        .toInt()
+        .coerceIn(1, pointCount)
+    val firstPoint = pointCount - availablePoints
+    val result = FloatArray(pointCount)
+
+    for (point in firstPoint until pointCount) {
+        val pointIndex = point - firstPoint
+        val sampleStartOffset = pointIndex * availableSamples / availablePoints
+        val sampleEndOffset = max(
+            sampleStartOffset + 1,
+            (((pointIndex + 1L) * availableSamples) / availablePoints).toInt()
+        ).coerceAtMost(availableSamples)
+        val sampleStart = windowStart + sampleStartOffset
+        val sampleEnd = windowStart + sampleEndOffset
+        var sum = 0f
+        var peak = 0f
+        var sampleCount = 0
+        for (sampleIndex in sampleStart until sampleEnd) {
+            val normalized = (volumeHistory[sampleIndex] * volumeNorm).coerceIn(0f, 1f)
+            sum += normalized
+            peak = max(peak, normalized)
+            sampleCount++
+        }
+        if (sampleCount > 0) {
+            val blendedPower = (sum / sampleCount * WAVEFORM_AVERAGE_WEIGHT +
+                peak * WAVEFORM_PEAK_WEIGHT).coerceIn(0f, 1f)
+            result[point] = sqrt(blendedPower)
+        }
+    }
+    return result
 }
 
 internal enum class AudioSignalState(val labelRes: Int, val descriptionRes: Int) {
@@ -594,14 +715,18 @@ internal fun audioSignalState(
     }
 }
 
-internal fun signalBarCount(signalState: AudioSignalState, loudness: Float): Int = when (signalState) {
-    AudioSignalState.NoRecentAudio -> 0
-    AudioSignalState.Quiet -> 1
-    AudioSignalState.LoudSound -> SIGNAL_BAR_COUNT
-    AudioSignalState.SoundDetected -> (loudness * SIGNAL_BAR_COUNT).toInt().coerceIn(2, SIGNAL_BAR_COUNT - 1)
-}
-
 private const val AUDIO_SIGNAL_STALE_MS = 2500L
 private const val SOUND_SIGNAL_THRESHOLD = 0.06f
 private const val LOUD_SIGNAL_THRESHOLD = 0.56f
-private const val SIGNAL_BAR_COUNT = 6
+private const val AUDIO_SIGNAL_BASE_BACKGROUND_MIX = 0.04f
+private const val AUDIO_SIGNAL_STALE_BACKGROUND_MIX = 0.02f
+private const val AUDIO_SIGNAL_MAX_BACKGROUND_MIX = 0.34f
+private const val AUDIO_SIGNAL_STRONG_CONTENT_MIX = 0.25f
+private const val WAVEFORM_WINDOW_SAMPLES = 1_500
+private const val WAVEFORM_MAX_POINTS = 240
+private val WAVEFORM_POINT_SPACING = 2.dp
+private const val WAVEFORM_BASELINE_FRACTION = 0.82f
+private const val WAVEFORM_MAX_HEIGHT_FRACTION = 0.68f
+private const val WAVEFORM_SILENCE_FLOOR = 0.002f
+private const val WAVEFORM_AVERAGE_WEIGHT = 0.7f
+private const val WAVEFORM_PEAK_WEIGHT = 0.3f
