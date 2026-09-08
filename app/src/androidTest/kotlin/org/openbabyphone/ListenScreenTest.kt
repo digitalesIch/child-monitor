@@ -78,6 +78,7 @@ class ListenScreenTest {
         setListenContent(nowMillis = 5_000L) { state }
 
         composeTestRule.onNodeWithText("Quiet").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("audio_signal_waveform").assertIsDisplayed()
 
         composeTestRule.runOnIdle {
             state = listeningState(floatArrayOf(0.2f), 4_000L)

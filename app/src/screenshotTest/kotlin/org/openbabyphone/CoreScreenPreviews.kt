@@ -144,12 +144,12 @@ fun listenConnecting() = ListenPreview(ListenSessionState.Connecting)
 @PreviewTest
 @Preview(widthDp = 360, heightDp = 720)
 @Composable
-fun listenQuiet() = ListenPreview(ListenSessionState.Listening, floatArrayOf(0.01f))
+fun listenQuiet() = ListenPreview(ListenSessionState.Listening, quietAudioHistory())
 
 @PreviewTest
 @Preview(widthDp = 360, heightDp = 720, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-fun listenLoudDark() = ListenPreview(ListenSessionState.Listening, floatArrayOf(0.9f), true)
+fun listenLoudDark() = ListenPreview(ListenSessionState.Listening, loudAudioHistory(), true)
 
 @PreviewTest
 @Preview(widthDp = 360, heightDp = 720)
@@ -299,6 +299,24 @@ private fun ListenPreview(
             onOpenNotificationSettings = {},
             onDisconnect = {}
         )
+    }
+}
+
+private fun quietAudioHistory(): FloatArray = FloatArray(600) { index ->
+    when {
+        index in 390..410 -> 0.05f
+        index % 43 == 0 -> 0.02f
+        else -> 0.004f
+    }
+}
+
+private fun loudAudioHistory(): FloatArray = FloatArray(1_500) { index ->
+    when {
+        index in 840..930 -> 0.82f
+        index in 1_140..1_260 -> 0.62f + (index % 5) * 0.06f
+        index in 1_380..1_499 -> 0.68f + (index % 4) * 0.07f
+        index % 17 == 0 -> 0.28f
+        else -> 0.08f
     }
 }
 

@@ -50,12 +50,12 @@ For current build versions, see `AGENTS.md` and `app/build.gradle`.
 **WP3: Animations & Motion**
 - Nav enter/exit transitions (fade + slide)
 - `animateContentSize()` on StartScreen
-- `animateColorAsState` for status background in ListenScreen
+- `animateFloatAsState` for audio signal card tint in ListenScreen
 - `animateItem()` for discovered device list
 
 **WP4: Accessibility**
 - `testTag` on all key interactive elements
-- `contentDescription` on icons and VolumeCanvas
+- `contentDescription` on icons and VolumeWaveform
 - `liveRegion` for status announcements (TalkBack)
 - Semantic descriptions for service status
 
